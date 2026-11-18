@@ -23,3 +23,14 @@ Edição de um vídeo vertical (478x850, ~96 s) seguindo o estilo do vídeo de r
 - Transcrição para gerar as legendas reais (ainda não existe `legendas.srt`).
 - Destaques em laranja, efeitos de impacto e painel de efeitos ainda não estão no plano.
 - Cortes de pausas e ritmo: depende da transcrição.
+
+## Efeitos no Remotion (`edicao/remotion/`)
+Os 21 efeitos do painel do vídeo de referência estão em `remotion/src/effects.tsx`, com a linha do tempo em `remotion/src/timeline.ts`.
+A base é o vídeo já cortado (`remotion/public/base.mp4`, gerado pela etapa de cortes do `render.py`; não é versionado).
+
+Passos:
+1. `cd edicao/remotion && npm install`
+2. Gerar a base: rodar a etapa de cortes do `render.py` e copiar o resultado para `remotion/public/base.mp4`.
+3. Render: `npx remotion render src/index.ts Edicao <saida.mp4> --browser-executable=<caminho do chrome> --concurrency=2`
+
+A legenda continua pendente: entra depois, com o `legendas.srt` no tempo do vídeo já cortado.
