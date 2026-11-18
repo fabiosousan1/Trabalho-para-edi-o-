@@ -1,0 +1,24 @@
+{
+  "fonte": "../videos/998fbd97-1000389650.mp4",
+  "referencia": "../videos/72778753-1000389542.mp4",
+  "saida": "saida/edicao_9x16.mp4",
+  "legendas_srt": "legendas.srt",
+  "fps": 30,
+  "resolucao": [478, 850],
+  "zoom_a_cada_segundos": 6,
+  "zoom_inicio_segundos": 1.5,
+  "zoom_duracao_segundos": 0.5,
+  "zoom_escala": 1.12,
+  "legenda": {
+    "fonte_tamanho": 30,
+    "cor": "white",
+    "fundo_caixa": true,
+    "cor_caixa": "black@0.55",
+    "posicao_y": "h*0.72"
+  },
+  "notas": [
+    "Estilo tirado da referência: legendas curtas em caixa, zoom rápido (punch-in) a cada poucos segundos e destaques de texto.",
+    "Os textos das legendas vêm de legendas.srt. Sem esse arquivo, o render sai sem legendas.",
+    "Destaques em laranja, efeitos de impacto e cortes rápidos ainda não estão no plano: entram depois que a transcrição estiver pronta."
+  ]
+}
