@@ -1,15 +1,24 @@
 """Monta a edição a partir de plano.json, em três etapas nesta ordem:
 
 1. Cortes: remove pausas longas (silêncio detectado no áudio), com margem de fala.
-2. Visual: zoom rápido periódico e flash branco em cada batida.
+2. Visual: zoom periódico, flash em cada batida e os efeitos listados em
+   "efeitos" (Impact frame, Dolly zoom, Rack focus, Voice note).
 3. Legendas: queima o texto de legendas.srt por último. O SRT precisa estar
    no tempo do vídeo já editado (depois dos cortes).
+
+Efeitos implementados em ffmpeg:
+    Impact frame  -> flash branco + zoom rápido (usa a batida do flash)
+    Dolly zoom    -> zoom gradual dentro da janela de tempo
+    Rack focus    -> desfoque pulsado na janela (aproximação)
+    Voice note    -> forma de onda do áudio sobre o vídeo na janela
+Os demais efeitos do vídeo de referência (Live cursor, Post wall, Comment drop,
+Press font etc.) dependem de animação de interface ou de texto e não entram aqui.
 
 Uso:
     python render.py plano.json --dry-run   # só mostra os comandos ffmpeg
     python render.py plano.json             # renderiza saida/edicao_9x16.mp4
 
-Requer ffmpeg com silencedetect, zoompan, eq e drawtext.
+Requer ffmpeg com silencedetect, zoompan, eq, boxblur, showwaves e drawtext.
 """
 import argparse
 import json
@@ -68,7 +77,6 @@ def etapa_cortes(plano, fonte, dest, dur):
         partes.append(f"[0:a]atrim=start={a:.3f}:end={b:.3f},asetpts=PTS-STARTPTS[a{i}]")
     entradas = "".join(f"[v{i}][a{i}]" for i in range(n))
     partes.append(f"{entradas}concat=n={n}:v=1:a=1[vout][aout]")
-    w, h = plano["resolucao"]
     cmd = [
         "ffmpeg", "-y", "-i", fonte,
         "-filter_complex", ";".join(partes),
@@ -79,19 +87,6 @@ def etapa_cortes(plano, fonte, dest, dur):
     return cmd, mantidos
 
 
-def expressao_zoom(plano, duracao_total):
-    """Expressão do zoompan: soma de pulsos triangulares, um a cada intervalo."""
-    escala = plano["zoom_escala"] - 1
-    meia = plano["zoom_duracao_segundos"] / 2
-    fps = plano["fps"]
-    termos = []
-    for t in pontos_zoom(plano, duracao_total):
-        termos.append(f"max(0,1-abs(on/{fps}-{t + meia:.3f})/{meia:.3f})")
-    if not termos:
-        return "1"
-    return f"1+{escala:.3f}*min(1,{'+'.join(termos)})"
-
-
 def pontos_zoom(plano, duracao_total):
     pontos, t = [], plano["zoom_inicio_segundos"]
     while t < duracao_total:
@@ -100,22 +95,70 @@ def pontos_zoom(plano, duracao_total):
     return pontos
 
 
+def expressao_zoom(plano, duracao_total, efeitos):
+    """Expressão do zoompan: pulsos periódicos (+ Impact frame) e Dolly zoom."""
+    escala = plano["zoom_escala"] - 1
+    meia = plano["zoom_duracao_segundos"] / 2
+    fps = plano["fps"]
+    pulsos = []
+    for t in pontos_zoom(plano, duracao_total):
+        pulsos.append(f"max(0,1-abs(on/{fps}-{t + meia:.3f})/{meia:.3f})")
+    for e in efeitos:
+        if e["nome"] == "Impact frame":
+            m = e["inicio"] + 0.1
+            pulsos.append(f"max(0,1-abs(on/{fps}-{m:.3f})/0.25)")
+    termos = [f"{escala:.3f}*min(1,{'+'.join(pulsos)})"] if pulsos else []
+    for e in efeitos:
+        if e["nome"] == "Dolly zoom":
+            a, b = e["inicio"], e["fim"]
+            termos.append(f"{e.get('zoom_extra', 0.18)}*between(on/{fps},{a},{b})*(on/{fps}-{a})/{b - a:.3f}")
+    return "1" + "".join(f"+{t}" for t in termos)
+
+
 def etapa_visual(plano, origem, dest, dur):
     w, h = plano["resolucao"]
     fps = plano["fps"]
-    filtros = [f"zoompan=z='{expressao_zoom(plano, dur)}':"
-               f"x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)':d=1:s={w}x{h}:fps={fps}"]
+    efeitos = plano.get("efeitos", [])
+
+    base = [f"zoompan=z='{expressao_zoom(plano, dur, efeitos)}':"
+            f"x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)':d=1:s={w}x{h}:fps={fps}"]
     fl = plano["flash"]
     if fl["ativo"]:
         for t in pontos_zoom(plano, dur):
-            filtros.append(f"eq=brightness={fl['brilho']}:"
-                           f"enable='between(t,{t:.3f},{t + fl['duracao_s']:.3f})'")
-    filtros.append("format=yuv420p")
+            base.append(f"eq=brightness={fl['brilho']}:"
+                        f"enable='between(t,{t:.3f},{t + fl['duracao_s']:.3f})'")
+    for e in efeitos:
+        if e["nome"] == "Impact frame":
+            base.append(f"eq=brightness={fl['brilho'] + 0.1}:"
+                        f"enable='between(t,{e['inicio']:.3f},{e['inicio'] + 0.12:.3f})'")
+    partes = [f"[0:v]{','.join(base)}[v0]"]
+    rotulo, n = "v0", 0
+
+    for e in efeitos:
+        if e["nome"] == "Rack focus":
+            n += 1
+            novo = f"v{n}"
+            partes.append(f"[{rotulo}]boxblur=luma_radius=6:luma_power=1:"
+                          f"enable='between(t,{e['inicio']:.3f},{e['fim']:.3f})'[{novo}]")
+            rotulo = novo
+
+    voz = [e for e in efeitos if e["nome"] == "Voice note"]
+    if voz:
+        alt = h // 7
+        cond = "+".join(f"between(t,{e['inicio']:.3f},{e['fim']:.3f})" for e in voz)
+        partes.append("[0:a]asplit=2[aout][aw]")
+        partes.append(f"[aw]showwaves=s={w}x{alt}:mode=cline:colors=0xFF8C2A:rate={fps}[wv]")
+        partes.append(f"[{rotulo}][wv]overlay=0:{h - alt - 60}:enable='{cond}'[vout]")
+        mapas = ["-map", "[vout]", "-map", "[aout]"]
+    else:
+        partes.append(f"[{rotulo}]null[vout]")
+        mapas = ["-map", "[vout]", "-map", "0:a"]
+
     return [
         "ffmpeg", "-y", "-i", origem,
-        "-vf", ",".join(filtros),
+        "-filter_complex", ";".join(partes), *mapas,
         "-c:v", "libx264", "-crf", "18", "-preset", "veryfast", "-pix_fmt", "yuv420p",
-        "-c:a", "copy", dest,
+        "-c:a", "aac", dest,
     ]
 
 

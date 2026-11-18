@@ -4,7 +4,10 @@
   "saida": "saida/edicao_9x16.mp4",
   "legendas_srt": "legendas.srt",
   "fps": 30,
-  "resolucao": [478, 850],
+  "resolucao": [
+    478,
+    850
+  ],
   "cortes": {
     "limiar_db": -32,
     "silencio_minimo_s": 0.5,
@@ -30,6 +33,28 @@
   "notas": [
     "Ordem das etapas: cortes, visual (zoom e flash), legendas por último.",
     "legendas.srt precisa estar no tempo do vídeo já cortado. Sem ele, o render sai sem legendas.",
-    "Destaques em laranja e efeitos de texto dependem da transcrição e entram com a legenda."
+    "Destaques em laranja e efeitos de texto dependem da transcrição e entram com a legenda.",
+    "Efeitos da referência aplicados: Impact frame, Dolly zoom, Rack focus, Voice note. Os demais exigem animação de interface ou texto."
+  ],
+  "efeitos": [
+    {
+      "nome": "Impact frame",
+      "inicio": 27.0
+    },
+    {
+      "nome": "Dolly zoom",
+      "inicio": 10.0,
+      "fim": 14.0
+    },
+    {
+      "nome": "Rack focus",
+      "inicio": 20.0,
+      "fim": 21.5
+    },
+    {
+      "nome": "Voice note",
+      "inicio": 33.0,
+      "fim": 39.0
+    }
   ]
 }
