@@ -5,10 +5,21 @@
   "legendas_srt": "legendas.srt",
   "fps": 30,
   "resolucao": [478, 850],
+  "cortes": {
+    "limiar_db": -32,
+    "silencio_minimo_s": 0.5,
+    "pausa_longa_s": 1.5,
+    "margem_s": 0.3
+  },
   "zoom_a_cada_segundos": 6,
   "zoom_inicio_segundos": 1.5,
   "zoom_duracao_segundos": 0.5,
   "zoom_escala": 1.12,
+  "flash": {
+    "ativo": true,
+    "brilho": 0.2,
+    "duracao_s": 0.12
+  },
   "legenda": {
     "fonte_tamanho": 30,
     "cor": "white",
@@ -17,8 +28,8 @@
     "posicao_y": "h*0.72"
   },
   "notas": [
-    "Estilo tirado da referência: legendas curtas em caixa, zoom rápido (punch-in) a cada poucos segundos e destaques de texto.",
-    "Os textos das legendas vêm de legendas.srt. Sem esse arquivo, o render sai sem legendas.",
-    "Destaques em laranja, efeitos de impacto e cortes rápidos ainda não estão no plano: entram depois que a transcrição estiver pronta."
+    "Ordem das etapas: cortes, visual (zoom e flash), legendas por último.",
+    "legendas.srt precisa estar no tempo do vídeo já cortado. Sem ele, o render sai sem legendas.",
+    "Destaques em laranja e efeitos de texto dependem da transcrição e entram com a legenda."
   ]
 }
