@@ -138,7 +138,7 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
             # Overlay B-roll while preserving original narration.
             overlaid = root / "overlaid.mp4"
             run("ffmpeg", "-y", "-i", subtitled, "-i", clip,
-                "-filter_complex", "[0:v][1:v]overlay=enable='between(t,2,4)':shortest=1[v]",
+                "-filter_complex", "[0:v][1:v]overlay=enable='between(t,2,4)':eof_action=pass[v]",
                 "-map", "[v]", "-map", "0:a", "-c:v", "libx264", "-preset", "veryfast",
                 "-crf", "23", "-c:a", "copy", overlaid)
             visual = overlaid
