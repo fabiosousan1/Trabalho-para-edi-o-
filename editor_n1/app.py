@@ -103,7 +103,7 @@ def edit(video, music, broll, intensity, music_volume, cinematic):
             a, b = remap(seg.start), remap(seg.end)
             if b > a:
                 scene_segments.append({"start": a, "end": b, "text": seg.text})
-        scene_plan = cinematic_plan(scene_segments)
+        scene_plan = cinematic_plan(scene_segments) if cinematic else []
 
         subs = root / "captions.ass"
         header = """[Script Info]
