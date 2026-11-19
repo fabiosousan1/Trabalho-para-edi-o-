@@ -8,6 +8,7 @@ from pathlib import Path
 
 import gradio as gr
 from faster_whisper import WhisperModel
+from cinematic_plan import plan as cinematic_plan
 
 MODEL = None
 
@@ -45,7 +46,7 @@ def ass_escape(txt):
     return re.sub(r"[{}\\]", "", txt).replace("\n", " ").strip()
 
 
-def edit(video, music, broll, intensity, music_volume):
+def edit(video, music, broll, intensity, music_volume, cinematic):
     if not video:
         raise gr.Error("Envie um vídeo MP4 primeiro.")
     with tempfile.TemporaryDirectory(prefix="editor_n1_") as tmp:
@@ -96,6 +97,14 @@ def edit(video, music, broll, intensity, music_volume):
                 elapsed += b - a
             return elapsed
 
+        # Convert transcript times into the edited timeline before planning scenes.
+        scene_segments = []
+        for seg in segments:
+            a, b = remap(seg.start), remap(seg.end)
+            if b > a:
+                scene_segments.append({"start": a, "end": b, "text": seg.text})
+        scene_plan = cinematic_plan(scene_segments)
+
         subs = root / "captions.ass"
         header = """[Script Info]
 ScriptType: v4.00+
@@ -129,6 +138,7 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
 
         # Optional user-supplied licensed B-roll, placed as a short visual insert.
         visual = subtitled
+        # Cinematic mode currently adjusts pacing and tonal treatment; scene recommendations are reviewed separately.
         if broll:
             clip = root / "broll.mp4"
             run("ffmpeg", "-y", "-stream_loop", "-1", "-i", broll,
@@ -160,23 +170,36 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
             "legendas": len(events),
             "musica": bool(music),
             "imagem_apoio": bool(broll),
+            "modo_cinematografico": bool(cinematic),
+            "plano_cenas": scene_plan,
             "observacao": "Cortes automáticos por fala, não revisão semântica humana."
         }
-        return str(out), transcript, json.dumps(report, ensure_ascii=False, indent=2)
+        return str(out), transcript, scene_plan, json.dumps(report, ensure_ascii=False, indent=2)
 
 
-with gr.Blocks(title="Editor Magnético N1") as app:
+MOBILE_CSS = """
+.gradio-container {max-width: 920px !important; margin: auto !important; padding: 12px !important;}
+@media (max-width: 650px) {
+  .gradio-container {padding: 8px !important;}
+  button {min-height: 52px !important; font-size: 17px !important;}
+  .wrap {gap: 12px !important;}
+}
+"""
+with gr.Blocks(title="Editor Magnético N1", css=MOBILE_CSS) as app:
     gr.Markdown("# Editor Magnético N1\nEnvie um vídeo e gere uma primeira edição automática. Use somente trilhas e imagens que você pode publicar.")
     video = gr.Video(label="Vídeo original", sources=["upload"], format="mp4")
     music = gr.Audio(label="Trilha sonora licenciada (opcional)", type="filepath")
     broll = gr.Video(label="Cena de apoio licenciada (opcional)", sources=["upload"])
     intensity = gr.Dropdown(["suave", "equilibrado", "dinamico"], value="equilibrado", label="Ritmo dos cortes")
     volume = gr.Slider(0.03, 0.25, value=0.10, step=0.01, label="Volume da trilha")
-    go = gr.Button("Editar meu vídeo", variant="primary")
+    cinematic = gr.Checkbox(value=True, label="Planejar cenas com emoção (cinematográfico)")
+    gr.Markdown("**Como funciona:** o plano emocional sugere cenas e trilhas para revisão. Nesta versão, as sugestões ainda não geram imagens ou músicas automaticamente.")
+    go = gr.Button("Criar edição e plano cinematográfico", variant="primary")
     result = gr.Video(label="MP4 final")
     transcript = gr.Textbox(label="Transcrição", lines=6)
+    scenes = gr.JSON(label="Plano de cenas sugerido pela IA local")
     report = gr.Code(label="Relatório da edição", language="json")
-    go.click(edit, [video, music, broll, intensity, volume], [result, transcript, report])
+    go.click(edit, [video, music, broll, intensity, volume, cinematic], [result, transcript, scenes, report])
 
 if __name__ == "__main__":
-    app.queue().launch(server_name="127.0.0.1")
+    app.queue(default_concurrency_limit=1).launch(server_name="127.0.0.1")
